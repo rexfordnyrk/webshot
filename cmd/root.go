@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"github.com/rexfordnyrk/webshot/capture"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"os"
+	"strings"
 )
 
 
@@ -58,6 +60,7 @@ func initViperConfig(cmd *cobra.Command) error {
 	//initialize viper
 	v := viper.New()
 
+
 	//specifying the type of configuration file format to be read
 	v.SetConfigType("json")
 
@@ -75,8 +78,42 @@ func initViperConfig(cmd *cobra.Command) error {
 		}
 	}
 
-	//temporarily log loaded config
-	fmt.Println("the settings",v.AllSettings())
+	//remove or comment out after testing
+	os.Setenv("WEBSHOT_HEIGHT","250")
+	os.Setenv("WEBSHOT_WIDTH", "1200")
+
+	//All envrironmental variables for config for this program must begin with this prefix
+	//to avoid conflict
+	v.SetEnvPrefix("WEBSHOT")
+
+	//All config flags must have their equivalent Environmental variable keys with underscores,
+	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+
+	// Checking for Env. Variables with The defined Prefix
+	v.AutomaticEnv()
+
+	// Bind the current command's flags to viper
+	bindFlags(cmd, v)
+
+
+	//temporarily print loaded viper config and the working config. Can be commented out if not needed
+	fmt.Printf("\n Viper Config: %+v\n",v.AllSettings())
+	fmt.Printf("\n Working config:  %+v\n\n", conf)
 
 	return nil
+}
+
+// Bind each cobra flag to its associated viper configuration (config file and environment variable)
+func bindFlags(cmd *cobra.Command, v *viper.Viper) {
+
+	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
+		//Get the name of the current config
+		configName := flag.Name
+
+		// Apply the viper config value to the flag when the flag is not set and viper has a value
+		if !flag.Changed && v.IsSet(configName) {
+			confVal := v.Get(configName)
+			cmd.Flags().Set(flag.Name, fmt.Sprintf("%v", confVal))
+		}
+	})
 }
